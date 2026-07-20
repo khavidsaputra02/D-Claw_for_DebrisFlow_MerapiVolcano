@@ -25,6 +25,7 @@ Simulation and post-processing pipeline for **cold lahar (lahar dingin) flow mod
   - [Optional — DEM erosion/analysis utility (`DEM Analisis.py`)](#optional--dem-erosionanalysis-utility-dem-analisispy)
 - [Key Parameters](#key-parameters)
 - [Output Files](#output-files)
+- [Sample Result](#sample-result)
 - [Troubleshooting](#troubleshooting)
 - [Notes on Path Configuration](#notes-on-path-configuration)
 
@@ -32,7 +33,11 @@ Simulation and post-processing pipeline for **cold lahar (lahar dingin) flow mod
 
 ## Overview
 
-This repository implements an end-to-end workflow for simulating a lahar (volcanic mudflow / debris flow) originating from a source region south of Merapi's summit ("Source Selatan"), using the **D-Claw** solver (a two-phase debris-flow model built on top of GeoClaw/AMRClaw within Clawpack). The pipeline:
+This repository implements an end-to-end workflow to **reproduce the cold lahar (lahar dingin) flood event on the southern flank of Mount Merapi, originating from the "Source Selatan" region**, using the **D-Claw** solver (a two-phase debris-flow model built on top of GeoClaw/AMRClaw within Clawpack).
+
+> **Reproducibility goal:** the entire processing workflow below (Steps 1–5) is built specifically to reproduce this southern-flank lahar event as defined by the included shapefiles — `Source Selatan_1.shp` (the actual lahar source polygon used to initialize the flow) and `Source Selatan.shp` (a matching overlay used for visualization). Running the steps in order, with these two shapefiles and `DEMPredict.tt3` as provided, should regenerate the same southern-source lahar-dingin simulation, runout extent, and hazard map documented in this README. If you intend to model a **different** source region or event, you must supply your own source shapefile(s) and update the corresponding paths/constants noted in each step.
+
+The pipeline:
 
 1. Reads a DEM (`DEMPredict.tt3`) and a source-region shapefile to build the initial basal topography, initial mass fraction, and initial flow depth grids.
 2. Runs the D-Claw AMR (adaptive mesh refinement) simulation over the domain.
@@ -186,10 +191,12 @@ make new
 
 Place the following files at the paths expected by each script (all scripts in this repo resolve most paths **relative to the script's own directory**, except where noted):
 
+> **Key reproducibility inputs:** `Source Selatan_1.shp` and `Source Selatan.shp` are the two files that make this pipeline reproduce *this specific* southern-flank (Source Selatan) lahar-dingin event rather than a generic one. Both are already included in this repository — do not replace them unless you deliberately want to model a different source area.
+
 | File | Required by | Notes |
 |---|---|---|
 | `DEMPredict.tt3` | `setinput.py`, `setplot.py`, `Peta potensi banjir lahar.py` | ESRI ASCII grid (6-line header), included in this repo |
-| `Source Selatan_1/Source Selatan_1.shp` (+ sidecar files) | `setinput.py` | **Lahar source polygon** — defines where flow is initialized |
+| `Source Selatan_1/Source Selatan_1.shp` (+ sidecar files) | `setinput.py` | **Lahar source polygon** — defines where flow is initialized; the shapefile this whole pipeline reproduces from |
 | `Source Selatan/Source Selatan.shp` (+ sidecar files) | `setinput.py` | Visualization overlay only, does **not** affect the simulation |
 | `Laharselatan.shp`, `Laharbarat-baratdaya.shp` | `Peta potensi banjir lahar.py` | Lahar-prone zone polygons for the hazard map — **not included**, supply your own |
 | `sungai.geojson` (rivers), `jalan.geojson` (roads) | `Peta potensi banjir lahar.py` | Base-map context layers — **not included** |
@@ -201,9 +208,11 @@ All shapefiles/coordinates in this pipeline are in **UTM Zone 49S (EPSG:32749)**
 
 Run the pipeline in the order below from inside the D-Claw example folder (see [installation step 4](#3-python-environment)), with your Clawpack environment activated (`CLAW` and `PYTHONPATH` set, virtualenv active). Steps 1–3 correspond directly to the standard D-Claw workflow (`make input` → `make .data`/`make .output` → `make .plots`); Steps 4–5 are extra post-processing scripts specific to this pipeline.
 
+> **This sequence reproduces the southern-source (Source Selatan) cold lahar event.** Step 1 is where reproducibility is anchored: it consumes `Source Selatan_1.shp` directly to define *where* the lahar initiates and *what shape* the source region has. As long as `Source Selatan_1.shp` (and its sidecar files) and `DEMPredict.tt3` remain unchanged, re-running Steps 1–5 in order will regenerate the same Source Selatan lahar-dingin scenario end-to-end — from initial conditions, through the AMR simulation, to the final runout and flood-potential maps.
+
 ### Step 1 — Prepare topography and source inputs (`setinput.py`)
 
-Reads `DEMPredict.tt3` and the source shapefiles, then writes the three GeoClaw topotype-3 input files D-Claw needs, plus verification plots.
+Reads `DEMPredict.tt3` and the **Source Selatan shapefiles** (`Source Selatan_1.shp` as the actual source polygon, `Source Selatan.shp` as the overlay), then writes the three GeoClaw topotype-3 input files D-Claw needs, plus verification plots. **This is the step that ties the whole simulation to the southern-source event** — everything downstream (Steps 2–5) inherits its initial conditions from here.
 
 ```bash
 python "setinput.py"
@@ -214,18 +223,18 @@ python "setinput.py"
 **What it does:**
 - Loads the DEM, flips it so row 0 = south, converts pixel-edge coordinates to pixel-center coordinates.
 - Cross-checks the DEM's derived domain bounds against known reference values and prints `OK`/`WARNING` diagnostics.
-- Reads `Source Selatan_1.shp` as the lahar source polygon and rasterizes a mass-fraction (`m0`) and initial-depth (`h0`) field inside it.
+- Reads **`Source Selatan_1.shp`** as the lahar source polygon — the exact footprint of the southern-flank source area to reproduce — and rasterizes a mass-fraction (`m0`) and initial-depth (`h0`) field inside it.
 - Writes:
   - `basal_topo.tt3` — the DEM converted directly to a D-Claw basal topography file
-  - `mass_frac.tt3` — initial solid mass fraction grid
+  - `mass_frac.tt3` — initial solid mass fraction grid, non-zero only inside the Source Selatan polygon
   - `surface_topo.tt3` — initial surface elevation (eta) grid
-- Generates 4 PNG verification plots: `source_area.png`, `basal_topo_hillshade.png`, `surface_topo.png`, `landslide_depth.png`, and prints summary statistics (elevation range, mean slope, source polygon area, initial depth stats).
+- Generates 4 PNG verification plots: `source_area.png`, `basal_topo_hillshade.png`, `surface_topo.png`, `landslide_depth.png`, and prints summary statistics (elevation range, mean slope, source polygon area, initial depth stats) — use `source_area.png` to visually confirm the source polygon matches the intended Source Selatan extent before proceeding.
 
-Adjust the two physical parameters at the top of the script before running for a different scenario:
+To faithfully reproduce the documented Source Selatan event, keep these two physical parameters at their given values (they were calibrated for this event); only change them if you are deliberately testing a different scenario:
 
 ```python
-m0 = 0.59   # initial solid mass fraction inside the source area
-h0 = 4.11   # initial lahar depth (meters)
+m0 = 0.59   # initial solid mass fraction inside the Source Selatan area
+h0 = 4.11   # initial lahar depth (meters) at Source Selatan
 ```
 
 ### Step 2 — Configure and run the simulation (`setrun.py`)
@@ -314,12 +323,12 @@ KALI_ADEM_RADIUS = 100.0
 H_THRESHOLD      = 0.01
 ```
 
-### Step 5 — Generate the flood-potential map (`Peta potensi banjir lahar.py`)
+### Step 5 — Generate the flood-potential map (`flood_potential_map.py`)
 
 Builds a composite hazard/exposure map: DEM hillshade base, lahar-prone zone shapefiles, rivers, roads, and settlement polygons.
 
 ```bash
-python "Peta potensi banjir lahar.py"
+python flood_potential_map.py
 ```
 
 **Before running**, update `WORK_DIR` and the filenames at the top of the script to point at your local data, or place all inputs alongside the script (the script searches `_SEARCH_DIRS` for each file):
@@ -402,19 +411,23 @@ hasil_sensitivitas.csv                            # runout/sensitivity summary
 <flood potential map>.png                          # composite hazard map
 ```
 
-## Troubleshooting
+## Sample Result
 
-- **`Exception: *** Must first set CLAW environment variable`** — you haven't exported `CLAW` (or you opened a new shell without re-sourcing it). `export CLAW=/path/to/clawpack`.
-- **Simulation blows up / crashes with tiny timesteps** — the timestepping and AMR parameters in `setrun.py` are already tuned conservatively (marked `STABILITY FIX` in comments); if you still see instability after changing the DEM or source, try lowering `cfl_desired`/`cfl_max` further or increasing `_FLAG_BUF`.
-- **`[WARNING] cellsize=... expected ~8.29 m`** from `setinput.py` — you're using a DEM with a different resolution than the reference; update `_CELLSIZE_EXPECTED` and the reference domain bounds (`_xlower_ref`, etc.) accordingly, or ignore if intentional.
-- **MP4 export fails / no video produced** — make sure `ffmpeg` is installed and on your `PATH`; `setplot.py` shells out to it.
-- **`Peta potensi banjir lahar.py` can't find input files** — check `WORK_DIR` and `_SEARCH_DIRS`, and make sure the shapefiles/GeoJSON/GeoPackage layers referenced (rivers, roads, settlements, lahar-prone zones) exist locally; they are not bundled in this repository.
+The figure below (`frame0162`, the final frame — Figure 1 from `setplot.py`) shows what a successful run of the Source Selatan reproduction pipeline produces at the end of the simulation (`t = 0:27:00`, i.e. `t = 1620 s = tfinal`):
 
-## Notes on Path Configuration
+![Sample result: Source Selatan cold lahar simulation, final frame](sample_result_source_selatan.png)
 
-Some scripts in this archive were authored with **absolute, machine-specific paths** (e.g. `DEM Analisis.py` uses `/home/venom/Downloads/Khavid/dclaw-main/...`, `Peta potensi banjir lahar.py` uses `D:\Tugas Akhir\...`). Before running them on a new machine:
+**Top panel — plan-view flow map:**
+- Hillshaded DEM of the Merapi summit and southern flank, in UTM Zone 49S (Easting/Northing, meters).
+- The **dashed blue outline ("Source Selatan")** marks the lahar source polygon from `Source Selatan_1.shp` — this is where the flow is initialized in Step 1.
+- The colored trace running downstream from the source, following the **Kali Gendol** river channel, shows simulated lahar depth (colorbar, "Kedalaman lahar", 0–~15 m) at the final output time.
+- The **blue circle "Kali Adem"** marks the fixed downstream reference point (also used by `Extract Runout dan Shp file.py` to report runout relative to this location).
+- The **gray transect line "Transek B–B' (Kali Gendol)"** marks the downstream profile line B→B' plotted in the bottom panel.
 
-1. Search each script's `CONFIGURATION` block near the top of the file.
-2. Replace hardcoded absolute paths with paths relative to your own clone, or use the `_SCRIPT_DIR` / `_abspath()` pattern already used in `setinput.py` and `Extract Runout dan Shp file.py` for portability.
+**Bottom panel — downstream transect (B–B', Sungai Gendol):**
+- Elevation profile along the flow path from the source (**B**) to the transect endpoint (**B'**), ~9+ km downstream.
+- Colors along the profile classify the flow regime by solid mass fraction `m`: **mud flow** (`m < 0.3`, blue), **hyperconcentrated flow** (`0.3 ≤ m < 0.6`, orange), and **lahar** (`m ≥ 0.6`, dark red).
+- The title reports the transect summary statistics at the final time: **`hmax = 6.65 m`** (maximum flow depth along the transect) and **`mmean = 0.62`** (mean solid mass fraction — i.e., the flow is, on average, in the lahar/debris-flow regime by the time it reaches the transect).
+- The dashed vertical line marks the **Kali Adem** reference point (~5523 m from the source along the transect), matching the marker in the top panel.
 
-`setinput.py` and `Extract Runout dan Shp file.py` already resolve paths relative to their own script location and should run unmodified as long as the `DEMPredict.tt3` and `Source Selatan*/` folders stay alongside them.
+This is the kind of result — a plan-view depth map plus a calibrated downstream transect with flow-regime classification and runout statistics — that Steps 1–3 (`setinput.py` → `setrun.py` → `setplot.py`) reproduce for the Source Selatan event, one PNG frame per output time step (162 frames total for `tfinal = 1620 s`), which are then assembled into `lahar_utama.mp4` (see [Step 3](#step-3--visualize-results-setplotpy)).
