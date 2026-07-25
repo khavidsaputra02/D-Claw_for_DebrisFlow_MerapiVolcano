@@ -19,7 +19,7 @@ Simulation and post-processing pipeline for **cold lahar (lahar dingin) flow mod
 - [Usage](#usage)
   - [Step 1 — Prepare topography and source inputs (`setinput.py`)](#step-1--prepare-topography-and-source-inputs-setinputpy)
   - [Step 2 — Configure and run the simulation (`setrun.py`)](#step-2--configure-and-run-the-simulation-setrunpy)
-  - [Step 3 — Visualize results (`setplot.py`)](#step-3--visualize-results-setplotpy)
+  - [Step 3 — Visualize results (`setplot_Selatan.py`)](#step-3--visualize-results-setplotpy)
   - [Step 4 — Extract runout and sensitivity data (`Extract Runout dan Shp file.py`)](#step-4--extract-runout-and-sensitivity-data-extract-runout-dan-shp-filepy)
   - [Step 5 — Generate the flood-potential map (`Peta potensi banjir lahar.py`)](#step-5--generate-the-flood-potential-map-peta-potensi-banjir-laharpy)
   - [Optional — DEM erosion/analysis utility (`DEM Analisis.py`)](#optional--dem-erosionanalysis-utility-dem-analisispy)
